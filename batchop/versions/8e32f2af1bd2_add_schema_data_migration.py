@@ -24,6 +24,12 @@ foo_table = table(
 
 
 def upgrade() -> None:
+    # Workaround for the problem
+    # bind = op.get_bind()
+    # inspector = sa.inspect(bind)
+    # if "_alembic_tmp_foo" in inspector.get_table_names():
+    #     op.drop_table("_alembic_tmp_trial_values")
+
     # Schema Migration
     with op.batch_alter_table("foo") as batch_op:
         batch_op.alter_column(
@@ -31,8 +37,10 @@ def upgrade() -> None:
             nullable=True,
         )
 
-    # Data Migration
-    raise Exception("An exception is raised during data migration")
+    # Write a data migration here like the following pattern.
+    # https://alembic.sqlalchemy.org/en/latest/cookbook.html#conditional-migration-elements
+    ...
+    raise Exception("An exception is raised during the data migration")
 
 
 def downgrade() -> None:

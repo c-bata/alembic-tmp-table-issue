@@ -2,7 +2,7 @@
 
 ## Step to reproduce
 
-Setup
+### Setup Python Environment
 
 ```
 $ python3.9 -m venv venv
@@ -10,7 +10,21 @@ $ source venv/bin/activate
 $ pip install alembic sqlalchemy
 ```
 
-Create `foo` table
+### Create `foo` Table
+
+```
+def upgrade() -> None:
+    # Create table
+    op.create_table(
+        "foo",
+        sa.Column("foo_id", sa.Integer(), nullable=False),
+        sa.Column("bar", sa.String(length=512), nullable=False),
+        sa.PrimaryKeyConstraint("foo_id"),
+    )
+
+    # Insert Dummy Data
+    op.bulk_insert(...)
+```
 
 ```
 $ alembic upgrade 90823bd3809e
@@ -19,7 +33,9 @@ INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
 INFO  [alembic.runtime.migration] Running upgrade  -> 90823bd3809e, create foo table
 ```
 
-Run a schema migration and a data migration like the following:
+### Run a schema migration and a data migration
+
+The migration script is like this:
 
 ```
 def upgrade() -> None:
@@ -30,8 +46,10 @@ def upgrade() -> None:
             nullable=True,
         )
 
-    # Data Migration
-    raise Exception("An exception is raised during data migration")
+    # Write a data migration here like the following pattern.
+    # https://alembic.sqlalchemy.org/en/latest/cookbook.html#conditional-migration-elements
+    ...
+    raise Exception("An exception is raised during the data migration")
 ```
 
 The script raises `Exception(...)` deliberately after quit from the `batch_alter_table("foo")` context manager.
@@ -51,7 +69,8 @@ Traceback (most recent call last):
 Exception: An exception is raised during data migration
 ```
 
-This is expected behavior. However, it cannot re-execute this script since there is `_alembic_tmp_foo` table, which is n temporary table for the batch migration.
+This is expected behavior. However, it cannot re-execute this script since there is `_alembic_tmp_foo` table, which is a temporary table for the batch migration.
+So we cannot re-execute this script even if we fixed the data migration.
 
 ```
 $ sqlite3 alembic.db
@@ -143,4 +162,28 @@ CREATE TABLE _alembic_tmp_foo (
 
 ]
 (Background on this error at: https://sqlalche.me/e/14/e3q8)
+```
+
+### Workaround
+
+As a workaround, we check the existence of `_alembic_tmp_foo`. It is a bit tricky though.
+
+```python
+from alembic import op
+import sqlalchemy as sa
+
+
+def upgrade() -> None:
+    # Workaround for the problem
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "_alembic_tmp_foo" in inspector.get_table_names():
+        op.drop_table("_alembic_tmp_trial_values")
+    
+    # Schema Migration
+    with op.batch_alter_table("foo") as batch_op:
+        batch_op.alter_column("bar", nullable=True)
+    
+    # Data Migration
+    raise Exception("An exception is raised during data migration")
 ```
