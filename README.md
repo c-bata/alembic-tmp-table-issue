@@ -69,8 +69,7 @@ Traceback (most recent call last):
 Exception: An exception is raised during data migration
 ```
 
-This is expected behavior. However, it cannot re-execute this script since there is `_alembic_tmp_foo` table, which is a temporary table for the batch migration.
-So we cannot re-execute this script even if we fixed the data migration.
+This is an expected behavior. However, the script cannot be rerun even if the data migration is fixed to avoid the exception since there is `_alembic_tmp_foo` table.
 
 ```
 $ sqlite3 alembic.db
@@ -282,32 +281,3 @@ Exception: An exception is raised during the data migration
 Alembic issues `ROLLBACK` statement due to an exception.
 However, SQLite3 does not seems to be able to rollback `CREATE TABLE _alembic_tmp_foo ...`.
 
-## Possible Solutions and Workaround
-
-### Automatically issues `DROP TABLE _alembic_tmp_foo;` statement
-
-Not sure if it is reasonable. However, automatically executing `DROP TABLE _alembic_tmp_foo` seems to work.
-
-### Manually remove a temporary table if exists
-
-One possible workaround is checking the existence of `_alembic_tmp_foo`. It is a bit tricky though.
-
-```python
-from alembic import op
-import sqlalchemy as sa
-
-
-def upgrade() -> None:
-    # Workaround for the problem
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-    if "_alembic_tmp_foo" in inspector.get_table_names():
-        op.drop_table("_alembic_tmp_trial_values")
-    
-    # Schema Migration
-    with op.batch_alter_table("foo") as batch_op:
-        batch_op.alter_column("bar", nullable=True)
-    
-    # Data Migration
-    raise Exception("An exception is raised during data migration")
-```
