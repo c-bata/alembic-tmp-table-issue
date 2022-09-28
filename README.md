@@ -1,6 +1,6 @@
 # alembic-tmp-table-issue
 
-## Step to reproduce
+## How to reproduce the issue
 
 ### Setup Python Environment
 
@@ -164,9 +164,133 @@ CREATE TABLE _alembic_tmp_foo (
 (Background on this error at: https://sqlalche.me/e/14/e3q8)
 ```
 
-### Workaround
+## What's happens
 
-As a workaround, we check the existence of `_alembic_tmp_foo`. It is a bit tricky though.
+I checked SQL queries by changing the logger level of `sqlalchemy.engine`.
+
+```
+# alembic.ini
+[logger_sqlalchemy]
+level = WARN   # -> Change to DEBUG
+handlers =
+qualname = sqlalchemy.engine
+```
+
+Then I got the following log.
+
+```
+$ alembic upgrade head
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [sqlalchemy.engine.Engine] PRAGMA main.table_info("alembic_version")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('cid', 'name', 'type', 'notnull', 'dflt_value', 'pk')
+DEBUG [sqlalchemy.engine.Engine] Row (0, 'version_num', 'VARCHAR(32)', 1, None, 1)
+INFO  [sqlalchemy.engine.Engine] SELECT alembic_version.version_num
+FROM alembic_version
+INFO  [sqlalchemy.engine.Engine] [generated in 0.00006s] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('version_num',)
+DEBUG [sqlalchemy.engine.Engine] Row ('90823bd3809e',)
+INFO  [sqlalchemy.engine.Engine] BEGIN (implicit)
+INFO  [alembic.runtime.migration] Running upgrade 90823bd3809e -> 8e32f2af1bd2, Add schema & data migration
+INFO  [sqlalchemy.engine.Engine] PRAGMA main.table_xinfo("foo")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('cid', 'name', 'type', 'notnull', 'dflt_value', 'pk', 'hidden')
+DEBUG [sqlalchemy.engine.Engine] Row (0, 'foo_id', 'INTEGER', 1, None, 1, 0)
+DEBUG [sqlalchemy.engine.Engine] Row (1, 'bar', 'VARCHAR(512)', 1, None, 0, 0)
+INFO  [sqlalchemy.engine.Engine] SELECT sql FROM  (SELECT * FROM sqlite_master UNION ALL   SELECT * FROM sqlite_temp_master) WHERE name = ? AND type = 'table'
+INFO  [sqlalchemy.engine.Engine] [raw sql] ('foo',)
+DEBUG [sqlalchemy.engine.Engine] Col ('sql',)
+DEBUG [sqlalchemy.engine.Engine] Row ('CREATE TABLE foo (\n\tfoo_id INTEGER NOT NULL, \n\tbar VARCHAR(512) NOT NULL, \n\tPRIMARY KEY (foo_id)\n)',)
+INFO  [sqlalchemy.engine.Engine] PRAGMA main.foreign_key_list("foo")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('id', 'seq', 'table', 'from', 'to', 'on_update', 'on_delete', 'match')
+INFO  [sqlalchemy.engine.Engine] PRAGMA temp.foreign_key_list("foo")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('id', 'seq', 'table', 'from', 'to', 'on_update', 'on_delete', 'match')
+INFO  [sqlalchemy.engine.Engine] SELECT sql FROM  (SELECT * FROM sqlite_master UNION ALL   SELECT * FROM sqlite_temp_master) WHERE name = ? AND type = 'table'
+INFO  [sqlalchemy.engine.Engine] [raw sql] ('foo',)
+DEBUG [sqlalchemy.engine.Engine] Col ('sql',)
+DEBUG [sqlalchemy.engine.Engine] Row ('CREATE TABLE foo (\n\tfoo_id INTEGER NOT NULL, \n\tbar VARCHAR(512) NOT NULL, \n\tPRIMARY KEY (foo_id)\n)',)
+INFO  [sqlalchemy.engine.Engine] PRAGMA main.index_list("foo")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('seq', 'name', 'unique', 'origin', 'partial')
+INFO  [sqlalchemy.engine.Engine] PRAGMA temp.index_list("foo")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('seq', 'name', 'unique', 'origin', 'partial')
+INFO  [sqlalchemy.engine.Engine] PRAGMA main.index_list("foo")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('seq', 'name', 'unique', 'origin', 'partial')
+INFO  [sqlalchemy.engine.Engine] PRAGMA temp.index_list("foo")
+INFO  [sqlalchemy.engine.Engine] [raw sql] ()
+DEBUG [sqlalchemy.engine.Engine] Col ('seq', 'name', 'unique', 'origin', 'partial')
+INFO  [sqlalchemy.engine.Engine] SELECT sql FROM  (SELECT * FROM sqlite_master UNION ALL   SELECT * FROM sqlite_temp_master) WHERE name = ? AND type = 'table'
+INFO  [sqlalchemy.engine.Engine] [raw sql] ('foo',)
+DEBUG [sqlalchemy.engine.Engine] Col ('sql',)
+DEBUG [sqlalchemy.engine.Engine] Row ('CREATE TABLE foo (\n\tfoo_id INTEGER NOT NULL, \n\tbar VARCHAR(512) NOT NULL, \n\tPRIMARY KEY (foo_id)\n)',)
+INFO  [sqlalchemy.engine.Engine]
+CREATE TABLE _alembic_tmp_foo (
+	foo_id INTEGER NOT NULL,
+	bar VARCHAR(512),
+	PRIMARY KEY (foo_id)
+)
+
+
+INFO  [sqlalchemy.engine.Engine] [no key 0.00004s] ()
+INFO  [sqlalchemy.engine.Engine] INSERT INTO _alembic_tmp_foo (foo_id, bar) SELECT foo.foo_id, foo.bar
+FROM foo
+INFO  [sqlalchemy.engine.Engine] [generated in 0.00005s] ()
+INFO  [sqlalchemy.engine.Engine]
+DROP TABLE foo
+INFO  [sqlalchemy.engine.Engine] [no key 0.00003s] ()
+INFO  [sqlalchemy.engine.Engine] ALTER TABLE _alembic_tmp_foo RENAME TO foo
+INFO  [sqlalchemy.engine.Engine] [no key 0.00003s] ()
+INFO  [sqlalchemy.engine.Engine] ROLLBACK
+Traceback (most recent call last):
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/bin/alembic", line 8, in <module>
+    sys.exit(main())
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/config.py", line 590, in main
+    CommandLine(prog=prog).main(argv=argv)
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/config.py", line 584, in main
+    self.run_cmd(cfg, options)
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/config.py", line 561, in run_cmd
+    fn(
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/command.py", line 322, in upgrade
+    script.run_env()
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/script/base.py", line 569, in run_env
+    util.load_python_file(self.dir, "env.py")
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/util/pyfiles.py", line 94, in load_python_file
+    module = load_module_py(module_id, path)
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/util/pyfiles.py", line 110, in load_module_py
+    spec.loader.exec_module(module)  # type: ignore
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/Users/c-bata/sandbox/alembic-sandbox/batchop/env.py", line 79, in <module>
+    run_migrations_online()
+  File "/Users/c-bata/sandbox/alembic-sandbox/batchop/env.py", line 73, in run_migrations_online
+    context.run_migrations()
+  File "<string>", line 8, in run_migrations
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/runtime/environment.py", line 853, in run_migrations
+    self.get_context().run_migrations(**kw)
+  File "/Users/c-bata/sandbox/alembic-sandbox/venv/lib/python3.10/site-packages/alembic/runtime/migration.py", line 623, in run_migrations
+    step.migration_fn(**kw)
+  File "/Users/c-bata/sandbox/alembic-sandbox/batchop/versions/8e32f2af1bd2_add_schema_data_migration.py", line 43, in upgrade
+    raise Exception("An exception is raised during the data migration")
+Exception: An exception is raised during the data migration
+```
+
+Alembic issues `ROLLBACK` statement due to an exception.
+However, SQLite3 does not seems to be able to rollback `CREATE TABLE _alembic_tmp_foo ...`.
+
+## Possible Solutions and Workaround
+
+### Automatically issues `DROP TABLE _alembic_tmp_foo;` statement
+
+Not sure if it is reasonable. However, automatically executing `DROP TABLE _alembic_tmp_foo` seems to work.
+
+### Manually remove a temporary table if exists
+
+One possible workaround is checking the existence of `_alembic_tmp_foo`. It is a bit tricky though.
 
 ```python
 from alembic import op
