@@ -46,7 +46,6 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         render_as_batch=True,
-        transactional_ddl=True,
     )
 
     with context.begin_transaction():
@@ -66,20 +65,21 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    @event.listens_for(connectable.engine, "connect")
-    def do_connect(dbapi_connection, correction_record):
-        # disable pysqlite's emitting of the BEGIN statement entirely.
-        # also stops it from emitting COMMIT before any DDL.
-        dbapi_connection.isolation_level = None
+    if connectable.dialect.name == "sqlite":
+        @event.listens_for(connectable.engine, "connect")
+        def do_connect(dbapi_connection, correction_record):
+            # disable pysqlite's emitting of the BEGIN statement entirely.
+            # also stops it from emitting COMMIT before any DDL.
+            dbapi_connection.isolation_level = None
 
-    @event.listens_for(connectable.engine, "begin")
-    def do_begin(conn):
-        # emit our own BEGIN
-        conn.exec_driver_sql("BEGIN")
+        @event.listens_for(connectable.engine, "begin")
+        def do_begin(conn):
+            # emit our own BEGIN
+            conn.exec_driver_sql("BEGIN")
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata, render_as_batch=True, transactional_ddl=True
+            connection=connection, target_metadata=target_metadata, render_as_batch=True
         )
 
         with context.begin_transaction():
