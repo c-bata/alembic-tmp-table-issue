@@ -24,12 +24,6 @@ foo_table = table(
 
 
 def upgrade() -> None:
-    # Workaround for the problem
-    # bind = op.get_bind()
-    # inspector = sa.inspect(bind)
-    # if "_alembic_tmp_foo" in inspector.get_table_names():
-    #     op.drop_table("_alembic_tmp_trial_values")
-
     # Schema Migration
     with op.batch_alter_table("foo") as batch_op:
         batch_op.alter_column(
